@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# FlowBot generated runtime state
+.flowbot/runs/
+.flowbot/cancelled_intake/
+
+# Local verification output
+tmp/
+
+# Local app/tool noise
+.playwright-mcp/
+.DS_Store
+Thumbs.db
+
+# Editor noise
+.vscode/
+.idea/
