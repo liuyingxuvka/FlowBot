@@ -26,4 +26,11 @@
 - Why FlowGuard was used: Installing a local Codex skill, recording version `0.1.0`, initializing git, and tagging the baseline are ordered side effects; completion should not be claimed before install validation, version recording, ignore rules, commit, and tag exist.
 - Workflow modeled or scoped: `flowbot_models/install_release_model.py` models skill source, installed skill, validation, version file, `.gitignore`, git init, initial commit, and version tag ordering.
 - Checks run: `python scripts/run_flowbot_install_release_checks.py`, `python scripts/check_flowbot_skill_install.py`, `openspec validate flowbot-model-first-runtime`, and `openspec validate install-flowbot-skill-initial-version` passed before the git baseline.
-- Findings and next action: The installed skill at `C:\Users\liu_y\.codex\skills\flowbot\SKILL.md` matches repository source `skills/flowbot/SKILL.md` and points to this project. The initial version is `0.1.0`; after commit, tag the baseline as `v0.1.0`.
+- Findings and next action: The installed local skill matches the rendered repository source `skills/flowbot/SKILL.md` and points to the active checkout. The initial local baseline version is `0.1.0`; after commit, tag the baseline as `v0.1.0`.
+
+## 2026-05-14: Public GitHub Release Preparation
+
+- Why FlowGuard was used: Publishing FlowBot to GitHub is an external side-effect workflow with privacy, version, tag, release, and branch-protection gates. It should not be claimed complete if source is pushed before public-boundary checks or if a release exists without the matching tag.
+- Workflow modeled or scoped: `flowbot_models/github_release_model.py` models the public release order: privacy audit, README preparation, version sync, checks, release commit, version tag, remote creation, branch push, tag push, GitHub Release creation, default-branch protection, and final completion claim.
+- Checks run: `python scripts/run_flowbot_github_release_checks.py` passed, along with protocol, route-synthesis, install-release, smoke, startup-intake, skill-install, and OpenSpec validation commands.
+- Findings and next action: The model detects known-bad hazards including release commit before privacy/readme/version readiness, tag before checks, branch push before remote, GitHub Release before tag push, and completion before branch protection. Use this model before future public release operations.

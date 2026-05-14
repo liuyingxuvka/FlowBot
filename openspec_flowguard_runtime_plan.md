@@ -157,7 +157,7 @@ Router 生成 current work_letter
 复用参考:
 
 ```text
-C:\Users\liu_y\Documents\FlowGuardProjectAutopilot_20260430\skills\flowpilot\assets\ui\startup_intake\
+FlowPilot checkout: skills/flowpilot/assets/ui/startup_intake/
 ```
 
 裁剪要求:

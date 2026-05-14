@@ -22,6 +22,6 @@ FlowBot now has a working MVP, but Codex cannot invoke it as a local skill yet a
 
 ## Impact
 
-- Local Codex skill directory: `C:\Users\liu_y\.codex\skills\flowbot`.
+- Local Codex skill directory: the user's Codex skills directory, normally `$CODEX_HOME/skills/flowbot` or `~/.codex/skills/flowbot`.
 - Repository files for versioning, install verification, and git hygiene.
 - Local git repository metadata and an initial version tag.

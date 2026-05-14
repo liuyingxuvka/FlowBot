@@ -2,6 +2,10 @@
 __pycache__/
 *.py[cod]
 
+# Local Codex and FlowGuard state
+.codex/
+.flowguard/
+
 # FlowBot generated runtime state
 .flowbot/runs/
 .flowbot/cancelled_intake/

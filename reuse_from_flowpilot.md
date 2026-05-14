@@ -13,9 +13,9 @@ FlowBot 一开始可以复用或裁剪 FlowPilot 的 startup intake UI。
 候选路径:
 
 ```text
-C:\Users\liu_y\Documents\FlowGuardProjectAutopilot_20260430\assets\readme-screenshots\startup-intake.png
-C:\Users\liu_y\Documents\FlowGuardProjectAutopilot_20260430\docs\ui\startup_intake_desktop_preview\
-C:\Users\liu_y\Documents\FlowGuardProjectAutopilot_20260430\skills\flowpilot\assets\ui\startup_intake\
+FlowPilot checkout: assets/readme-screenshots/startup-intake.png
+FlowPilot checkout: docs/ui/startup_intake_desktop_preview/
+FlowPilot checkout: skills/flowpilot/assets/ui/startup_intake/
 ```
 
 FlowBot 需要的版本应该更简单:

@@ -13,8 +13,9 @@ work request, background-agent toggle, confirm/cancel. Confirm writes the
 FlowBot intake artifacts and invokes the existing runtime from that confirmed
 intake.
 
-The local Codex skill source lives at `skills/flowbot/SKILL.md` and is installed
-to `C:\Users\liu_y\.codex\skills\flowbot`.
+The public-safe Codex skill source lives at `skills/flowbot/SKILL.md`. Install
+it locally with `python scripts/install_flowbot_skill.py`; the installer renders
+the local checkout path into the user's Codex skills directory.
 
 ## Run Layout
 
@@ -120,14 +121,17 @@ Created when PM rejects a node and retry limit has not been exceeded.
 
 - `flowbot_models/protocol_model.py`: FlowBot Router/Controller protocol safety.
 - `flowbot_models/route_synthesis_model.py`: PM route synthesis through FlowGuard topology.
+- `flowbot_models/github_release_model.py`: public GitHub release ordering for privacy, validation, tag, release, and branch-protection gates.
 
 Runners:
 
 ```powershell
+python scripts/run_flowbot_github_release_checks.py
 python scripts/run_flowbot_protocol_checks.py
 python scripts/run_flowbot_route_synthesis_checks.py
 python scripts/run_flowbot_smoke_checks.py
 python scripts/run_flowbot_demo.py
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run_flowbot_startup_intake_smoke.ps1
+python scripts/install_flowbot_skill.py
 python scripts/check_flowbot_skill_install.py
 ```

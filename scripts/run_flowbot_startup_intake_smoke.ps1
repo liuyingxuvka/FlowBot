@@ -37,10 +37,15 @@ if ($null -eq $runDir) {
 $createdNewRun = -not ($beforeConfirmRuns -contains $runDir.Name)
 $statePath = Join-Path $runDir.FullName "router_state.json"
 $state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+$resultJsonPath = Join-Path $runDir.FullName "intake\flowbot_intake_result.json"
+$resultJson = Get-Content -LiteralPath $resultJsonPath -Raw | ConvertFrom-Json
 
 $checks.confirm_creates_run = @{
     ok = ($createdNewRun -and $state.status -eq "DONE")
     run_id = $runDir.Name
+}
+$checks.default_language = @{
+    ok = ($resultJson.language -eq "en")
 }
 $checks.intake_artifacts = @{
     ok = @(

@@ -1,6 +1,6 @@
 ---
 name: flowbot
-description: Opt-in only. Use this skill only when the user explicitly asks to use FlowBot or the flowbot skill, for example "Use FlowBot" or "使用 FlowBot". Runs the local FlowBot MVP from C:\Users\liu_y\Documents\FlowBot_20260514 with native startup intake, Router/Controller/PM/Worker letters, and PM-owned FlowGuard route synthesis. Do not activate implicitly for large tasks, generic planning, FlowPilot requests, repository work, or existing .flowbot directories.
+description: Opt-in only. Use this skill only when the user explicitly asks to use FlowBot or the flowbot skill, for example "Use FlowBot" or "使用 FlowBot". Runs the local FlowBot MVP from <FLOWBOT_REPO> with native startup intake, Router/Controller/PM/Worker letters, and PM-owned FlowGuard route synthesis. Do not activate implicitly for large tasks, generic planning, FlowPilot requests, repository work, or existing .flowbot directories.
 ---
 
 # FlowBot
@@ -18,13 +18,13 @@ Do not infer activation from task size, long plans, generic automation language,
 Canonical local project root:
 
 ```powershell
-C:\Users\liu_y\Documents\FlowBot_20260514
+<FLOWBOT_REPO>
 ```
 
-Initial version:
+Installed source version:
 
 ```text
-0.1.0
+0.1.1
 ```
 
 Before a formal run, verify the root exists and the real FlowGuard package is importable:
@@ -38,7 +38,7 @@ python -c "import flowguard; print(flowguard.SCHEMA_VERSION)"
 For an interactive user-facing run, open the native startup intake:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\liu_y\Documents\FlowBot_20260514\flowbot\assets\ui\startup_intake\flowbot_startup_intake.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File <FLOWBOT_REPO>\flowbot\assets\ui\startup_intake\flowbot_startup_intake.ps1
 ```
 
 The startup intake is the authority for activation. It writes the sealed FlowBot intake body/result/receipt/envelope and starts the existing runtime from the confirmed intake. If the user cancels the intake, do not create a run and do not continue.
@@ -46,7 +46,7 @@ The startup intake is the authority for activation. It writes the sealed FlowBot
 For an explicit headless run or smoke-style check:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\liu_y\Documents\FlowBot_20260514\flowbot\assets\ui\startup_intake\flowbot_startup_intake.ps1 -HeadlessConfirmText "<user request>"
+powershell -NoProfile -ExecutionPolicy Bypass -File <FLOWBOT_REPO>\flowbot\assets\ui\startup_intake\flowbot_startup_intake.ps1 -HeadlessConfirmText "<user request>"
 ```
 
 After a run, inspect the latest `.flowbot/runs/<run-id>/router_state.json`. A successful MVP run ends with `status: DONE` and has `artifacts/final_report.md`.

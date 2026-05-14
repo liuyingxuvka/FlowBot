@@ -70,13 +70,14 @@ function Get-FileSha256([string]$Path) {
     }
 }
 
-function Write-CancelledIntake {
+function Write-CancelledIntake([string]$Language = "en") {
     $cancelledDir = Join-Path $RepoRoot ".flowbot\cancelled_intake"
     New-Item -ItemType Directory -Force -Path $cancelledDir | Out-Null
     $resultPath = Join-Path $cancelledDir ("cancelled-" + [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss") + ".json")
     $result = @{
         schema_version = "flowbot.intake_result.v1"
         status = "cancelled"
+        language = $Language
         controller_visibility = "cancel_status_only"
         body_text_included = $false
         recorded_at = Get-UtcNow
@@ -85,7 +86,7 @@ function Write-CancelledIntake {
     return $resultPath
 }
 
-function Write-ConfirmedIntake([string]$BodyText, [bool]$BackgroundAgents) {
+function Write-ConfirmedIntake([string]$BodyText, [bool]$BackgroundAgents, [string]$Language = "en") {
     if ([string]::IsNullOrWhiteSpace($BodyText)) {
         throw "Work request cannot be empty."
     }
@@ -111,6 +112,7 @@ function Write-ConfirmedIntake([string]$BodyText, [bool]$BackgroundAgents) {
         schema_version = "flowbot.intake_receipt.v1"
         status = "confirmed"
         ui_surface = "native_wpf_startup_intake"
+        language = $Language
         startup_answers = $answers
         confirmed_by_user = $true
         cancelled_by_user = $false
@@ -126,6 +128,7 @@ function Write-ConfirmedIntake([string]$BodyText, [bool]$BackgroundAgents) {
         schema_version = "flowbot.intake_envelope.v1"
         status = "confirmed"
         source = "native_wpf_startup_intake"
+        language = $Language
         startup_answers = $answers
         body_path = Get-ProjectRelativePath $bodyPath
         body_hash = $bodyHash
@@ -142,6 +145,7 @@ function Write-ConfirmedIntake([string]$BodyText, [bool]$BackgroundAgents) {
         schema_version = "flowbot.intake_result.v1"
         status = "confirmed"
         run_id = $runId
+        language = $Language
         startup_answers = $answers
         receipt_path = Get-ProjectRelativePath $receiptPath
         envelope_path = Get-ProjectRelativePath $envelopePath
@@ -177,7 +181,7 @@ if ($HeadlessCancel) {
 }
 
 if (-not [string]::IsNullOrWhiteSpace($HeadlessConfirmText)) {
-    $resultPath = Write-ConfirmedIntake $HeadlessConfirmText $true
+    $resultPath = Write-ConfirmedIntake $HeadlessConfirmText $true "en"
     $runtimeOutput = Invoke-FlowBotRuntime $resultPath
     $resultPath | Write-Output
     if (-not [string]::IsNullOrWhiteSpace($runtimeOutput)) {
@@ -186,15 +190,29 @@ if (-not [string]::IsNullOrWhiteSpace($HeadlessConfirmText)) {
     exit 0
 }
 
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class FlowBotDpi {
+    [DllImport("shcore.dll")]
+    public static extern int SetProcessDpiAwareness(int awareness);
+
+    [DllImport("user32.dll")]
+    public static extern bool SetProcessDPIAware();
+}
+"@
+
+try {
+    [FlowBotDpi]::SetProcessDpiAwareness(2) | Out-Null
+} catch {
+    try { [FlowBotDpi]::SetProcessDPIAware() | Out-Null } catch {}
+}
+
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName PresentationCore
 Add-Type -AssemblyName WindowsBase
 Add-Type -AssemblyName System.Xaml
-
-if ($SmokeTest) {
-    "UI_SMOKE_OK"
-    exit 0
-}
 
 $IconUri = ([System.Uri]::new($IconPath)).AbsoluteUri
 $script:StartupIntakeCompleted = $false
@@ -206,18 +224,24 @@ $Xaml = @"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="FlowBot"
     Width="860"
-    Height="620"
-    MinWidth="760"
-    MinHeight="560"
+    Height="680"
+    MinWidth="780"
+    MinHeight="650"
     WindowStartupLocation="CenterScreen"
     Background="#FFFDF7"
     FontFamily="Segoe UI Variable Text, Segoe UI"
+    TextOptions.TextFormattingMode="Display"
+    TextOptions.TextRenderingMode="ClearType"
+    UseLayoutRounding="True"
+    SnapsToDevicePixels="True"
     ResizeMode="CanResizeWithGrip">
   <Window.Resources>
     <SolidColorBrush x:Key="InkBrush" Color="#141414" />
     <SolidColorBrush x:Key="MutedBrush" Color="#706A62" />
     <SolidColorBrush x:Key="LineBrush" Color="#E2DCD2" />
+    <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="FieldBrush" Color="#FBFAF7" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#B9821D" />
     <Style x:Key="PrimaryButton" TargetType="Button">
       <Setter Property="MinWidth" Value="132" />
       <Setter Property="Height" Value="44" />
@@ -228,15 +252,114 @@ $Xaml = @"
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border
+                x:Name="ButtonBorder"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="8">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ButtonBorder" Property="Background" Value="#2A2723" />
+                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#2A2723" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="ButtonBorder" Property="Background" Value="#000000" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="LanguageChoice" TargetType="RadioButton">
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinWidth" Value="68" />
+      <Setter Property="Foreground" Value="#625C55" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border
+                x:Name="ChoiceBorder"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="1"
+                CornerRadius="15"
+                Padding="10,0">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="ChoiceBorder" Property="Background" Value="#141414" />
+                <Setter TargetName="ChoiceBorder" Property="BorderBrush" Value="#141414" />
+                <Setter Property="Foreground" Value="#FFFDF7" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ChoiceBorder" Property="BorderBrush" Value="#CFC7BA" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="ScrollBarPageButton" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RepeatButton">
+            <Border Background="Transparent" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="ScrollBarThumb" TargetType="Thumb">
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+            <Border Background="#CBC3B8" CornerRadius="4" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="ScrollBar">
+      <Setter Property="Width" Value="10" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Grid Background="Transparent" Width="10">
+              <Track x:Name="PART_Track" IsDirectionReversed="True">
+                <Track.DecreaseRepeatButton>
+                  <RepeatButton Command="ScrollBar.PageUpCommand" Style="{StaticResource ScrollBarPageButton}" />
+                </Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb Style="{StaticResource ScrollBarThumb}" />
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton>
+                  <RepeatButton Command="ScrollBar.PageDownCommand" Style="{StaticResource ScrollBarPageButton}" />
+                </Track.IncreaseRepeatButton>
+              </Track>
+            </Grid>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style x:Key="SwitchToggle" TargetType="ToggleButton">
       <Setter Property="Width" Value="88" />
       <Setter Property="Height" Value="40" />
       <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Focusable" Value="True" />
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ToggleButton">
-            <Grid Width="88" Height="40">
+            <Grid Width="88" Height="40" SnapsToDevicePixels="True">
               <Border x:Name="Track" Background="#141414" BorderBrush="#141414" BorderThickness="1" CornerRadius="20" />
               <TextBlock x:Name="StateLabel" Text="ON" Foreground="#FFFDF7" FontSize="10" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="15,0,0,0" />
               <Ellipse x:Name="Knob" Width="30" Height="30" Fill="#FFFDF7" Stroke="#D8CFC1" StrokeThickness="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="4" />
@@ -251,6 +374,9 @@ $Xaml = @"
                 <Setter TargetName="StateLabel" Property="Margin" Value="0,0,12,0" />
                 <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Left" />
               </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Track" Property="BorderBrush" Value="#B9821D" />
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -258,67 +384,114 @@ $Xaml = @"
     </Style>
   </Window.Resources>
 
-  <Grid Margin="38">
+  <Grid Background="{StaticResource PanelBrush}" ClipToBounds="True">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <Grid Grid.Row="0" Margin="0,0,0,26">
+    <Grid Grid.Row="0" Margin="38,44,38,24">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto" />
         <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
-      <Image Grid.Column="0" Source="$IconUri" Width="56" Height="56" Margin="0,0,16,0" RenderOptions.BitmapScalingMode="HighQuality" />
+      <Image Grid.Column="0" Source="$IconUri" Width="56" Height="56" Margin="0,0,16,0" RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center" />
       <StackPanel Grid.Column="1" VerticalAlignment="Center">
-        <TextBlock Text="FlowBot" Foreground="{StaticResource InkBrush}" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="28" FontWeight="SemiBold" />
-        <TextBlock Text="Model-first startup intake" Foreground="{StaticResource MutedBrush}" FontSize="13" Margin="0,5,0,0" />
+        <TextBlock x:Name="TitleText" Text="FlowBot" Foreground="{StaticResource InkBrush}" FontFamily="Segoe UI Variable Display, Segoe UI" FontSize="28" FontWeight="SemiBold" />
       </StackPanel>
+      <Border
+          Grid.Column="2"
+          BorderBrush="Transparent"
+          BorderThickness="0"
+          Padding="0"
+          Height="36"
+          VerticalAlignment="Top"
+          Background="Transparent">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Viewbox Width="18" Height="18" Margin="0,0,7,0">
+            <Canvas Width="24" Height="24">
+              <Ellipse Width="18" Height="18" Canvas.Left="3" Canvas.Top="3" Stroke="#141414" StrokeThickness="1.5" />
+              <Line X1="4" Y1="9" X2="20" Y2="9" Stroke="#141414" StrokeThickness="1.5" />
+              <Line X1="4" Y1="15" X2="20" Y2="15" Stroke="#141414" StrokeThickness="1.5" />
+              <Path Data="M12 3 C15 6 15 18 12 21" Stroke="#141414" StrokeThickness="1.5" Fill="{x:Null}" />
+              <Path Data="M12 3 C9 6 9 18 12 21" Stroke="#141414" StrokeThickness="1.5" Fill="{x:Null}" />
+            </Canvas>
+          </Viewbox>
+          <Border Background="Transparent" CornerRadius="17" Padding="2">
+            <StackPanel Orientation="Horizontal">
+              <RadioButton x:Name="EnglishLanguage" GroupName="Language" IsChecked="True" Content="English" Style="{StaticResource LanguageChoice}" />
+              <RadioButton x:Name="ChineseLanguage" GroupName="Language" Content="中文" Style="{StaticResource LanguageChoice}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
     </Grid>
 
-    <Grid Grid.Row="1">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" MinWidth="360" />
-        <ColumnDefinition Width="260" />
-      </Grid.ColumnDefinitions>
-      <StackPanel Grid.Column="0" Margin="0,0,24,0">
-        <TextBlock Text="工作要求" Foreground="{StaticResource InkBrush}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
-        <TextBox
-            x:Name="WorkRequest"
-            MinHeight="318"
-            AcceptsReturn="True"
-            TextWrapping="Wrap"
-            VerticalScrollBarVisibility="Auto"
-            BorderBrush="#C9BFAF"
-            BorderThickness="1"
-            Background="{StaticResource FieldBrush}"
-            Foreground="{StaticResource InkBrush}"
-            FontSize="14"
-            Padding="14"
-            SpellCheck.IsEnabled="True" />
-      </StackPanel>
-      <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="0,32,0,0">
-        <Grid MinHeight="82">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-          <StackPanel Grid.Column="0" VerticalAlignment="Center">
-            <TextBlock Text="后台智能体" Foreground="{StaticResource InkBrush}" FontSize="14" FontWeight="SemiBold" />
-            <TextBlock Text="启用 PM 和 Worker。" Foreground="{StaticResource MutedBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,5,16,0" />
+    <ScrollViewer
+        Grid.Row="1"
+        VerticalScrollBarVisibility="Auto"
+        HorizontalScrollBarVisibility="Disabled"
+        Padding="38,0,30,0">
+      <Grid MinHeight="350">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" MinWidth="330" />
+          <ColumnDefinition Width="*" MinWidth="330" />
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0" Margin="0,0,18,0">
+          <StackPanel>
+            <DockPanel Margin="0,0,0,10">
+              <TextBlock x:Name="RequestLabel" Text="Work request" Foreground="{StaticResource InkBrush}" FontSize="14" FontWeight="SemiBold" DockPanel.Dock="Left" />
+            </DockPanel>
+            <Grid>
+              <TextBox
+                  x:Name="WorkRequest"
+                  MinHeight="318"
+                  AcceptsReturn="True"
+                  TextWrapping="Wrap"
+                  VerticalScrollBarVisibility="Auto"
+                  BorderBrush="#C9BFAF"
+                  BorderThickness="1"
+                  Background="{StaticResource FieldBrush}"
+                  Foreground="{StaticResource InkBrush}"
+                  FontSize="14"
+                  Padding="14"
+                  SpellCheck.IsEnabled="True" />
+              <TextBlock
+                  x:Name="PlaceholderText"
+                  Text="Write the instructions you want FlowBot to follow."
+                  Foreground="#8D857A"
+                  FontSize="14"
+                  Margin="18,15,18,0"
+                  TextWrapping="Wrap"
+                  IsHitTestVisible="False" />
+            </Grid>
           </StackPanel>
-          <ToggleButton x:Name="AgentsToggle" Grid.Column="1" IsChecked="True" Style="{StaticResource SwitchToggle}" VerticalAlignment="Center" />
         </Grid>
-      </StackPanel>
-    </Grid>
 
-    <Grid Grid.Row="2" Margin="0,30,0,0">
+        <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="6,30,0,0">
+          <Grid MinHeight="82" Margin="0,0,0,26">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+              <TextBlock x:Name="AgentsTitle" Text="Background agents" Foreground="{StaticResource InkBrush}" FontSize="14" FontWeight="SemiBold" />
+              <TextBlock x:Name="AgentsBody" Text="Allow PM and Worker agents." Foreground="{StaticResource MutedBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,5,16,0" />
+            </StackPanel>
+            <ToggleButton x:Name="AgentsToggle" Grid.Column="1" IsChecked="True" Style="{StaticResource SwitchToggle}" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+      </Grid>
+    </ScrollViewer>
+
+    <Grid Grid.Row="2" Margin="38,34,38,26">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
-      <Button x:Name="ConfirmButton" Grid.Row="0" HorizontalAlignment="Center" Style="{StaticResource PrimaryButton}" Content="确认启动" />
+      <Button x:Name="ConfirmButton" Grid.Row="0" HorizontalAlignment="Center" Style="{StaticResource PrimaryButton}" Content="Confirm" />
       <TextBlock x:Name="StatusText" Grid.Row="1" HorizontalAlignment="Center" Foreground="{StaticResource MutedBrush}" FontSize="12.5" Margin="0,10,0,0" />
     </Grid>
   </Grid>
@@ -328,30 +501,106 @@ $Xaml = @"
 $Reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($Xaml))
 $Window = [Windows.Markup.XamlReader]::Load($Reader)
 $Window.Icon = [System.Windows.Media.Imaging.BitmapImage]::new([System.Uri]::new($IconPath))
-$WorkRequest = $Window.FindName("WorkRequest")
-$AgentsToggle = $Window.FindName("AgentsToggle")
-$ConfirmButton = $Window.FindName("ConfirmButton")
-$StatusText = $Window.FindName("StatusText")
 
-$ConfirmButton.Add_Click({
+$Names = @(
+    "EnglishLanguage", "ChineseLanguage", "TitleText", "RequestLabel",
+    "WorkRequest", "PlaceholderText", "AgentsTitle", "AgentsBody",
+    "AgentsToggle", "ConfirmButton", "StatusText"
+)
+
+$Ui = @{}
+foreach ($Name in $Names) {
+    $Ui[$Name] = $Window.FindName($Name)
+}
+
+$Copy = @{
+    en = @{
+        Window = "FlowBot"
+        Title = "FlowBot"
+        RequestLabel = "Work request"
+        Placeholder = "Write the instructions you want FlowBot to follow."
+        AgentsTitle = "Background agents"
+        AgentsBody = "Allow PM and Worker agents."
+        Confirm = "Confirm"
+        Creating = "Creating FlowBot run..."
+        Confirmed = "FlowBot run completed."
+        EmptyRequest = "Work request cannot be empty."
+    }
+    zh = @{
+        Window = "FlowBot"
+        Title = "FlowBot"
+        RequestLabel = "工作要求"
+        Placeholder = "写下你希望 FlowBot 完成的工作。"
+        AgentsTitle = "后台智能体"
+        AgentsBody = "启用 PM 和 Worker。"
+        Confirm = "确认启动"
+        Creating = "正在创建 FlowBot run..."
+        Confirmed = "FlowBot run 已完成。"
+        EmptyRequest = "工作要求不能为空。"
+    }
+}
+
+function Get-Language {
+    if ($Ui.ChineseLanguage.IsChecked) { return "zh" }
+    return "en"
+}
+
+function Update-Placeholder {
+    if ([string]::IsNullOrWhiteSpace($Ui.WorkRequest.Text)) {
+        $Ui.PlaceholderText.Visibility = [System.Windows.Visibility]::Visible
+    } else {
+        $Ui.PlaceholderText.Visibility = [System.Windows.Visibility]::Collapsed
+    }
+}
+
+function Apply-Language {
+    $Lang = Get-Language
+    $T = $Copy[$Lang]
+    $Window.Title = $T.Window
+    $Ui.TitleText.Text = $T.Title
+    $Ui.RequestLabel.Text = $T.RequestLabel
+    $Ui.PlaceholderText.Text = $T.Placeholder
+    $Ui.AgentsTitle.Text = $T.AgentsTitle
+    $Ui.AgentsBody.Text = $T.AgentsBody
+    $Ui.ConfirmButton.Content = $T.Confirm
+    $Ui.StatusText.Text = ""
+}
+
+$Ui.EnglishLanguage.Add_Checked({ Apply-Language })
+$Ui.ChineseLanguage.Add_Checked({ Apply-Language })
+$Ui.WorkRequest.Add_TextChanged({ Update-Placeholder })
+Apply-Language
+Update-Placeholder
+
+$Ui.ConfirmButton.Add_Click({
+    $Lang = Get-Language
+    $T = $Copy[$Lang]
     try {
-        $StatusText.Text = "正在创建 FlowBot run..."
-        $resultPath = Write-ConfirmedIntake $WorkRequest.Text ([bool]$AgentsToggle.IsChecked)
+        if ([string]::IsNullOrWhiteSpace($Ui.WorkRequest.Text)) {
+            throw $T.EmptyRequest
+        }
+        $Ui.StatusText.Text = $T.Creating
+        $resultPath = Write-ConfirmedIntake $Ui.WorkRequest.Text ([bool]$Ui.AgentsToggle.IsChecked) $Lang
         $runtimeOutput = Invoke-FlowBotRuntime $resultPath
         $script:StartupIntakeCompleted = $true
         $script:ExitCode = 0
-        $StatusText.Text = "FlowBot run 已完成。"
+        $Ui.StatusText.Text = $T.Confirmed
         $Window.Tag = $runtimeOutput
         $Window.Close()
     } catch {
-        $StatusText.Text = $_.Exception.Message
+        $Ui.StatusText.Text = $_.Exception.Message
     }
 })
+
+if ($SmokeTest) {
+    "UI_SMOKE_OK"
+    exit 0
+}
 
 $Window.Add_Closing({
     if (-not $script:StartupIntakeCompleted) {
         try {
-            Write-CancelledIntake | Out-Null
+            Write-CancelledIntake (Get-Language) | Out-Null
             $script:ExitCode = 0
         } catch {
             $script:ExitCode = 1
